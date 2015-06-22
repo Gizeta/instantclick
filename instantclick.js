@@ -22,6 +22,11 @@ var InstantClick = function(document, location) {
       $isWaitingForCompletion = false,
       $trackedAssets = [],
 
+  // MediaWiki-related variables
+      $mwStylesheets = [],
+      $mwLoadedAssets = [],
+      $mwRequiredAssets = [],
+
   // Variables defined by public functions
       $useWhitelist,
       $preloadOnMousedown,
@@ -30,7 +35,8 @@ var InstantClick = function(document, location) {
         fetch: [],
         receive: [],
         wait: [],
-        change: []
+        change: [],
+        end: []
       }
 
 
@@ -302,6 +308,15 @@ var InstantClick = function(document, location) {
           $title = alteredOnReceive.title
         }
       }
+	  
+	  if ($url.indexOf('&') >= 0 || $url.indexOf('Special:') >= 0) {
+        $mustRedirect = true
+		if ($isWaitingForCompletion) {
+          $isWaitingForCompletion = false
+          display($url)
+        }
+		return
+      }
 
       var urlWithoutHash = removeHash($url)
       $history[urlWithoutHash] = {
@@ -309,6 +324,8 @@ var InstantClick = function(document, location) {
         title: $title,
         scrollY: urlWithoutHash in $history ? $history[urlWithoutHash].scrollY : 0
       }
+
+      $mwRequiredAssets = []
 
       var elems = doc.head.children,
           found = 0,
@@ -322,6 +339,75 @@ var InstantClick = function(document, location) {
           for (var j = $trackedAssets.length - 1; j >= 0; j--) {
             if ($trackedAssets[j] == data) {
               found++
+            }
+          }
+        }
+        
+        if (elem.nodeName === 'SCRIPT') {
+          var copy = document.createElement('script')
+          if (elem.hasAttribute('src')) {
+            if (elem.getAttribute('src').indexOf('load.php?') < 0) {
+              copy.src = elem.getAttribute('src')
+            }
+            else {
+              continue
+            }
+          }
+          if (elem.innerHTML) {
+            if (elem.innerHTML.indexOf('mw.loader.implement(') >= 0) {
+              copy.innerHTML = elem.innerHTML.replace(/mw\.loader\.implement\(/gm, 'InstantClick.mw.implement(')
+            }
+            else if (elem.innerHTML.indexOf('mw.loader.load(') >= 0) {
+              copy.innerHTML = elem.innerHTML.replace(/mw\.loader\.load\(/gm, 'InstantClick.mw.load(')
+            }
+            else {
+              copy.innerHTML = elem.innerHTML
+            }
+          }
+          $mwRequiredAssets.push(copy)
+        }
+        else if (elem.nodeName === 'STYLE') {
+          var found = false
+          for (var j = $mwLoadedAssets.length - 1; j >= 0; j--) {
+            if ($mwLoadedAssets[j] == data) {
+              found = true
+              break
+            }
+          }
+          if (!found) {
+            var copy = document.createElement('style')
+            if (elem.hasAttribute('src')) {
+              copy = document.createElement('link')
+              copy.setAttribute('rel', 'stylesheet')
+              if (elem.getAttribute('src').indexOf('load.php?') >= 0) {
+                var url = rewriteExtUrl(elem.getAttribute('src'))
+                if (url !== '') {
+                  copy.setAttribute('href', url)
+                }
+                else {
+                  continue
+                }
+              }
+              else {
+                copy.setAttribute('href', elem.getAttribute('src'))
+              }
+            }
+            if (elem.innerHTML) {
+              copy.innerHTML = elem.innerHTML
+            }
+            $mwRequiredAssets.push(copy)
+          }
+        }
+        else if (elem.nodeName === 'LINK' && elem.getAttribute('rel') === 'stylesheet') {
+          var copy = document.createElement('link')
+          copy.setAttribute('rel', 'stylesheet')
+          if (elem.hasAttribute('href')) {
+            if (elem.getAttribute('href').indexOf('load.php?') >= 0) {
+              var url = rewriteExtUrl(elem.getAttribute('href'))
+              if (url !== '') {
+                copy.setAttribute('href', url)
+                $mwRequiredAssets.push(copy)
+              }
             }
           }
         }
@@ -355,6 +441,46 @@ var InstantClick = function(document, location) {
     document.body.addEventListener('click', click, true)
 
     if (!isInitializing) {
+      var elems = document.head.children,
+          headElem
+      for (var i = elems.length - 1; i >= 0; i--) {
+        elem = elems[i]
+        if (!elem.hasAttribute('data-instant-track')) {
+          if (elem.nodeName === 'SCRIPT') {
+            if (elem.hasAttribute('src') && elem.getAttribute('src').indexOf('load.php') < 0) {
+              document.head.removeChild(elem)
+            }
+            if (elem.innerHTML) {
+              document.head.removeChild(elem)
+            }
+          }
+          else if (elem.nodeName === 'STYLE') {
+            if (elem.hasAttribute('src') && elem.getAttribute('src').indexOf('load.php') < 0) {
+              document.head.removeChild(elem)
+            }
+          }
+          else if (elem.nodeName === 'LINK' && elem.getAttribute('rel') === 'stylesheet') {
+            if (elem.hasAttribute('href') && elem.getAttribute('href').indexOf('load.php') < 0) {
+              document.head.removeChild(elem)
+            }
+          }
+        }
+      }
+      for (i = 0, j = $mwRequiredAssets.length; i < j; i++) {
+        headElem = $mwRequiredAssets[i]
+        if (headElem.nodeName === 'STYLE' && headElem.innerHTML) {
+          document.body.appendChild(headElem)
+        }
+        else {
+          document.head.appendChild(headElem)
+        }
+        $mwLoadedAssets.push(headElem.getAttribute('href') || headElem.getAttribute('src') || headElem.innerHTML)
+        
+        if (headElem.nodeName === 'LINK') {
+          recordExtFromUrl(headElem.getAttribute('href'))
+        }
+      } 
+
       var scripts = document.body.getElementsByTagName('script'),
           script,
           copy,
@@ -371,13 +497,23 @@ var InstantClick = function(document, location) {
           copy.src = script.src
         }
         if (script.innerHTML) {
-          copy.innerHTML = script.innerHTML
+          if (script.innerHTML.indexOf('document.write') >= 0) {
+            copy.src = script.innerHTML.match(/src=\\"(.+?)\\"/)[1].replace(/\\u0026amp;/gm, '&')
+          }
+          else if (script.innerHTML.indexOf('mw.loader.load(') >= 0) {
+            copy.innerHTML = script.innerHTML.replace(/mw\.loader\.load\(/gm, 'InstantClick.mw.load(')
+          }
+          else {
+            copy.innerHTML = script.innerHTML
+          }
         }
         parentNode = script.parentNode
         nextSibling = script.nextSibling
         parentNode.removeChild(script)
         parentNode.insertBefore(copy, nextSibling)
       }
+      
+      triggerPageEvent('end')
     }
   }
 
@@ -494,6 +630,97 @@ var InstantClick = function(document, location) {
     $history[$currentLocationWithoutHash].scrollY = pageYOffset
     setPreloadingAsHalted()
     changePage($title, $body, $url)
+  }
+
+
+  ////////// MEDIAWIKI FUNCTIONS //////////
+
+
+  function mwImplement(module, script, style, msgs, templates) {
+    var mod = mw.loader.moduleRegistry[module]
+    if (mod != null) {
+      mod.script = script
+      script($, $)
+    }
+    else {
+      mw.loader.implement(module, script, style, msgs, templates)
+    }
+  }
+  
+  function mwLoad(module, type, async) {
+    if (typeof module === 'string') {
+      mwRun(module)
+    }
+    else {
+      for (var i = module.length - 1; i >= 0; i--) {
+        mwRun(module[i])
+      }
+    }
+    mw.loader.load(module, type, async)
+  }
+
+  function mwRun(module) {
+    var mod = mw.loader.moduleRegistry[module]
+    if (mod != null && mod.state === 'ready' && typeof mod.script === 'function') {
+      mod.script($, $)
+    }
+  }
+
+  function recordExtFromUrl(url) {
+    var matches = unescape(url).match(/modules=([^&]+)/)
+    var mapString = matches[1].split('|')
+    for (i = 0, j = mapString.length; i < j; i++) {
+      var str = mapString[i].split(',')
+      $mwStylesheets.push(str[0])
+      if (str.length > 1) {
+        var prefix = str[0].substring(0, str[0].lastIndexOf('.') + 1)
+        for (m = 1, n = str.length; m < n; m++) {
+          $mwStylesheets.push(prefix + str[m])
+        }
+      }
+    }
+  }
+
+  function rewriteExtUrl(url) {
+    var loading = []
+    var matches = unescape(url).match(/modules=([^&]+)/)
+    var mapString = matches[1].split('|')
+    for (i = 0, j = mapString.length; i < j; i++) {
+      var str = mapString[i].split(',')
+      loading.push(str[0])
+      if (str.length > 1) {
+        var prefix = str[0].substring(0, str[0].lastIndexOf('.') + 1)
+        for (m = 1, n = str.length; m < n; m++) {
+          loading.push(prefix + str[m])
+        }
+      }
+    }
+
+    var request = []
+    for (i = 0, j = loading.length; i < j; i++) {
+      var found = false
+      for (m = 0, n = $mwStylesheets.length; m < n; m++) {
+        if (loading[i] === $mwStylesheets[m]) {
+          found = true
+          break
+        }
+      }
+      if (!found) {
+        request.push(loading[i])
+      }
+    }
+    
+    if (request.length > 0) {
+      var replaceStr = ''
+      for (i = 0, j = request.length; i < j; i++) {
+        replaceStr += request[i] + '|'
+      }
+      replaceStr = replaceStr.substring(0, replaceStr.length - 1)
+      return url.replace(/modules=([^&]+)/, 'modules=' + replaceStr)
+    }
+    else {
+      return ''
+    }
   }
 
 
@@ -675,6 +902,9 @@ var InstantClick = function(document, location) {
       /* Already initialized */
       return
     }
+    if (location.href.indexOf('&') >= 0 || location.href.indexOf('Special:') >= 0) {
+      return
+    }
     if (!supported) {
       triggerPageEvent('change', true)
       return
@@ -709,6 +939,23 @@ var InstantClick = function(document, location) {
            retrieve `href`s and `src`s from the Ajax response.
         */
         $trackedAssets.push(data)
+      }
+      
+      if (elem.nodeName === 'STYLE') {
+        if (elem.hasAttribute('src') && elem.getAttribute('src').indexOf('load.php?') >= 0) {
+          recordExtFromUrl(elem.getAttribute('src'))
+        }
+        else {
+          $mwLoadedAssets.push(elem.getAttribute('src') || elem.innerHTML)
+        }
+      }
+      else if (elem.nodeName === 'LINK' && elem.getAttribute('rel') === 'stylesheet') {
+        if (elem.getAttribute('href').indexOf('load.php?') >= 0) {
+          recordExtFromUrl(elem.getAttribute('href'))
+        }
+        else {
+          $mwLoadedAssets.push(elem.getAttribute('href'))
+        }
       }
     }
 
@@ -751,7 +998,12 @@ var InstantClick = function(document, location) {
   return {
     supported: supported,
     init: init,
-    on: on
+    on: on,
+    mw: {
+      implement: mwImplement,
+      load: mwLoad,
+      run: mwRun
+    }
   }
 
 }(document, location);
