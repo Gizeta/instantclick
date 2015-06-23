@@ -308,14 +308,14 @@ var InstantClick = function(document, location) {
           $title = alteredOnReceive.title
         }
       }
-	  
-	  if ($url.indexOf('&') >= 0 || $url.indexOf('Special:') >= 0) {
+      
+      if ($url.indexOf('&') >= 0 || $url.indexOf('Special:') >= 0) {
         $mustRedirect = true
-		if ($isWaitingForCompletion) {
+        if ($isWaitingForCompletion) {
           $isWaitingForCompletion = false
           display($url)
         }
-		return
+        return
       }
 
       var urlWithoutHash = removeHash($url)
@@ -356,9 +356,6 @@ var InstantClick = function(document, location) {
           if (elem.innerHTML) {
             if (elem.innerHTML.indexOf('mw.loader.implement(') >= 0) {
               copy.innerHTML = elem.innerHTML.replace(/mw\.loader\.implement\(/gm, 'InstantClick.mw.implement(')
-            }
-            else if (elem.innerHTML.indexOf('mw.loader.load(') >= 0) {
-              copy.innerHTML = elem.innerHTML.replace(/mw\.loader\.load\(/gm, 'InstantClick.mw.load(')
             }
             else {
               copy.innerHTML = elem.innerHTML
@@ -497,11 +494,11 @@ var InstantClick = function(document, location) {
           copy.src = script.src
         }
         if (script.innerHTML) {
+          if (script.innerHTML.indexOf('modules=site') >= 0) {
+            continue
+          }
           if (script.innerHTML.indexOf('document.write') >= 0) {
             copy.src = script.innerHTML.match(/src=\\"(.+?)\\"/)[1].replace(/\\u0026amp;/gm, '&')
-          }
-          else if (script.innerHTML.indexOf('mw.loader.load(') >= 0) {
-            copy.innerHTML = script.innerHTML.replace(/mw\.loader\.load\(/gm, 'InstantClick.mw.load(')
           }
           else {
             copy.innerHTML = script.innerHTML
@@ -645,18 +642,6 @@ var InstantClick = function(document, location) {
     else {
       mw.loader.implement(module, script, style, msgs, templates)
     }
-  }
-  
-  function mwLoad(module, type, async) {
-    if (typeof module === 'string') {
-      mwRun(module)
-    }
-    else {
-      for (var i = module.length - 1; i >= 0; i--) {
-        mwRun(module[i])
-      }
-    }
-    mw.loader.load(module, type, async)
   }
 
   function mwRun(module) {
@@ -1001,7 +986,6 @@ var InstantClick = function(document, location) {
     on: on,
     mw: {
       implement: mwImplement,
-      load: mwLoad,
       run: mwRun
     }
   }
