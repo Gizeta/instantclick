@@ -441,7 +441,12 @@ var InstantClick = function(document, location) {
     }
     document.body.addEventListener('click', click, true)
 
-    if (!isInitializing && !$manualChange) {
+    if (!isInitializing) {
+      if ($manualChange) {
+        triggerPageEvent('end')
+        return
+      }
+
       var elems = document.head.children,
           headElem
       for (var i = elems.length - 1; i >= 0; i--) {
