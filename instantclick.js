@@ -36,8 +36,7 @@ var InstantClick = function(document, location) {
         fetch: [],
         receive: [],
         wait: [],
-        change: [],
-        end: []
+        change: []
       }
 
 
@@ -441,12 +440,7 @@ var InstantClick = function(document, location) {
     }
     document.body.addEventListener('click', click, true)
 
-    if (!isInitializing) {
-      if ($manualChange) {
-        triggerPageEvent('end')
-        return
-      }
-
+    if (!isInitializing && !$manualChange) {
       var elems = document.head.children,
           headElem
       for (var i = elems.length - 1; i >= 0; i--) {
@@ -518,8 +512,6 @@ var InstantClick = function(document, location) {
         parentNode.removeChild(script)
         parentNode.insertBefore(copy, nextSibling)
       }
-      
-      triggerPageEvent('end')
     }
   }
 
