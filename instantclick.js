@@ -21,6 +21,7 @@ var InstantClick = function(document, location) {
       $isPreloading = false,
       $isWaitingForCompletion = false,
       $trackedAssets = [],
+      $manualChange = true,
 
   // MediaWiki-related variables
       $mwStylesheets = [],
@@ -183,6 +184,8 @@ var InstantClick = function(document, location) {
     var userscriptEvent = document.createEvent('HTMLEvents')
     userscriptEvent.initEvent('instantclick:newpage', true, true)
     dispatchEvent(userscriptEvent)
+    
+    $manualChange = true
   }
 
   function setPreloadingAsHalted() {
@@ -438,7 +441,7 @@ var InstantClick = function(document, location) {
     }
     document.body.addEventListener('click', click, true)
 
-    if (!isInitializing) {
+    if (!isInitializing && !$manualChange) {
       var elems = document.head.children,
           headElem
       for (var i = elems.length - 1; i >= 0; i--) {
@@ -627,6 +630,7 @@ var InstantClick = function(document, location) {
     }
     $history[$currentLocationWithoutHash].scrollY = pageYOffset
     setPreloadingAsHalted()
+    $manualChange = false
     changePage($title, $body, $url)
   }
 
