@@ -321,13 +321,6 @@ var InstantClick = function(document, location) {
         return
       }
 
-      var urlWithoutHash = removeHash($url)
-      $history[urlWithoutHash] = {
-        body: $body,
-        title: $title,
-        scrollY: urlWithoutHash in $history ? $history[urlWithoutHash].scrollY : 0
-      }
-
       $mwRequiredAssets = []
 
       var elems = doc.head.children,
@@ -360,6 +353,10 @@ var InstantClick = function(document, location) {
             if (elem.innerHTML.indexOf('mw.loader.implement(') >= 0) {
               copy.innerHTML = elem.innerHTML.replace(/mw\.loader\.implement\(/gm, 'InstantClick.mw.implement(')
             }
+			else if (elem.innerHTML.indexOf('wgInternalRedirectTargetUrl') >= 0) {
+			  $url = location.protocol + "//" + location.host + elem.innerHTML.match(/wgInternalRedirectTargetUrl":"(.+?)"/)[1]
+			  copy.innerHTML = elem.innerHTML
+			}
             else {
               copy.innerHTML = elem.innerHTML
             }
@@ -414,6 +411,13 @@ var InstantClick = function(document, location) {
       }
       if (found != $trackedAssets.length) {
         $mustRedirect = true // Assets have changed
+      }
+
+      var urlWithoutHash = removeHash($url)
+      $history[urlWithoutHash] = {
+        body: $body,
+        title: $title,
+        scrollY: urlWithoutHash in $history ? $history[urlWithoutHash].scrollY : 0
       }
     }
     else {
