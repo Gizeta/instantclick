@@ -59,6 +59,10 @@ var InstantClick = function(document, location) {
   }
 
   function isBlacklisted(elem) {
+    if ($url.indexOf('&') >= 0 || $url.indexOf('Special:') >= 0) {
+      return true
+    }
+    
     do {
       if (!elem.hasAttribute) { // Parent of <html>
         break
@@ -353,10 +357,10 @@ var InstantClick = function(document, location) {
             if (elem.innerHTML.indexOf('mw.loader.implement(') >= 0) {
               copy.innerHTML = elem.innerHTML.replace(/mw\.loader\.implement\(/gm, 'InstantClick.mw.implement(')
             }
-			else if (elem.innerHTML.indexOf('wgInternalRedirectTargetUrl') >= 0) {
-			  $url = location.protocol + "//" + location.host + elem.innerHTML.match(/wgInternalRedirectTargetUrl":"(.+?)"/)[1]
-			  copy.innerHTML = elem.innerHTML
-			}
+            else if (elem.innerHTML.indexOf('wgInternalRedirectTargetUrl') >= 0) {
+              $url = location.protocol + "//" + location.host + elem.innerHTML.match(/wgInternalRedirectTargetUrl":"(.+?)"/)[1]
+              copy.innerHTML = elem.innerHTML
+            }
             else {
               copy.innerHTML = elem.innerHTML
             }
