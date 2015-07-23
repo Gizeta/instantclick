@@ -156,6 +156,8 @@ var InstantClick = function(document, location) {
     }
 
     instantanize()
+    bar.done()
+    triggerPageEvent('change', false)
 
     if (newUrl) {
       history.pushState(null, null, newUrl)
@@ -179,9 +181,6 @@ var InstantClick = function(document, location) {
     else {
       scrollTo(0, scrollY)
     }
-
-    bar.done()
-    triggerPageEvent('change', false)
 
     // Real event, useful for combining userscripts, but only for that so it’s undocumented.
     var userscriptEvent = document.createEvent('HTMLEvents')
